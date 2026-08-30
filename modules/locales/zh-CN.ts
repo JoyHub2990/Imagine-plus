@@ -47,4 +47,7 @@ export default {
   save_anyway: '仍然保存',
   cancel: '取消',
   save_partial: '已保存 {0} 张图片，{1} 个任务仍在处理中',
+  unsaved_close_confirm: '还有 {0} 张导入的图片尚未保存，仍要关闭吗？',
+  importing_images: '正在导入图片…',
+  saving_images: '正在保存图片…',
 }

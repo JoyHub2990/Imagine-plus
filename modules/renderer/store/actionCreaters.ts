@@ -9,6 +9,7 @@ import {
   IUpdateInfo,
   IResizeOptions,
   SupportedExt,
+  IBusyChange,
 } from '../../common/types'
 
 export default {
@@ -42,6 +43,8 @@ export default {
 
   taskOptimizeFail: createAction<string>(ACTIONS.TASK_OPTIMIZE_FAIL),
 
+  taskSaved: createAction<string[]>(ACTIONS.TASK_SAVED),
+
   taskDetail: createAction<string | null>(ACTIONS.TASK_SELECTED_ID_UPDATE),
 
   appUpdateInfo: createAction<IUpdateInfo>(ACTIONS.APP_UPDATABLE),
@@ -55,4 +58,6 @@ export default {
   resizeApply: createAction<IResizeOptions>(ACTIONS.RESIZE_APPLY),
 
   resizeClear: createAction(ACTIONS.RESIZE_CLEAR),
+
+  busyChange: createAction<IBusyChange>(ACTIONS.BUSY_CHANGE),
 }

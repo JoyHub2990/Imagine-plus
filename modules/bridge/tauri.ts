@@ -162,6 +162,9 @@ export function createTauriAPI(): ImagineAPI {
         case IpcChannel.APP_UPDATE:
           updateListeners.push(listener as UpdateListener)
           break
+        case IpcChannel.BUSY_CHANGE:
+          listen('BUSY_CHANGE', (event) => listener(event.payload as never))
+          break
         default:
           logger.warn(`unhandled ipcListen channel: ${channel}`)
       }
@@ -211,8 +214,8 @@ export function createTauriAPI(): ImagineAPI {
 /** prime the config cache and kick off the update check before first render */
 export async function initTauriBridge(): Promise<void> {
   // Tauri never fires beforeunload on window close; replay the close
-  // request as a cancelable synthetic event so the alone-mode close
-  // interception in Alone.tsx keeps working unchanged
+  // request as a cancelable synthetic event so the renderer can warn
+  // about unsaved imported images.
   getCurrentWindow().onCloseRequested((event) => {
     const e = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(e)

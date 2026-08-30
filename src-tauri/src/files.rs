@@ -212,9 +212,15 @@ pub fn unoccupied_file(file_path: &Path) -> PathBuf {
 }
 
 /// Port of `saveFiles`: copy optimized files out of the tmp cache.
-/// Per-file copy errors are logged but do not abort the batch,
-/// matching the Electron behavior.
-pub fn save_files(images: &[ImageFile], save_type: SaveType, dirname: Option<&Path>) {
+/// Per-file copy errors are logged but do not abort the batch. The returned
+/// IDs let the renderer mark only successfully written results as saved.
+pub fn save_files(
+    images: &[ImageFile],
+    save_type: SaveType,
+    dirname: Option<&Path>,
+) -> Vec<String> {
+    let mut saved_ids = Vec::new();
+
     for image in images {
         let mut save_path = PathBuf::from(reext(&image.original_name, &image.ext));
 
@@ -224,7 +230,7 @@ pub fn save_files(images: &[ImageFile], save_type: SaveType, dirname: Option<&Pa
                 save_path = unoccupied_file(&save_path);
             }
             SaveType::NewDir => {
-                let Some(dir) = dirname else { return };
+                let Some(dir) = dirname else { return saved_ids };
                 let name = save_path.file_name().map(PathBuf::from).unwrap_or_default();
                 save_path = unoccupied_file(&dir.join(name));
             }
@@ -232,10 +238,13 @@ pub fn save_files(images: &[ImageFile], save_type: SaveType, dirname: Option<&Pa
         }
 
         let src = get_file_path(&image.id, &image.ext);
-        if let Err(err) = fs::copy(&src, &save_path) {
-            log::error!("failed to save {}: {err}", save_path.display());
+        match fs::copy(&src, &save_path) {
+            Ok(_) => saved_ids.push(image.id.clone()),
+            Err(err) => log::error!("failed to save {}: {err}", save_path.display()),
         }
     }
+
+    saved_ids
 }
 
 pub fn save_file(image: &ImageFile, file_path: &Path) -> Result<(), String> {

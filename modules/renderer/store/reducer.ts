@@ -13,6 +13,8 @@ import {
   IDefaultOptions,
   IResizeOptions,
   ResizeMode,
+  BusyKind,
+  IBusyChange,
 } from '../../common/types'
 import {
   ACTIONS,
@@ -130,6 +132,7 @@ export default handleActions<IState, any>({
           image,
           options: resizeOptions.enabled ? { ...opts, resize: resizeOptions } : opts,
           status: TaskStatus.PENDING,
+          saved: false,
         }
       }),
     ])
@@ -153,6 +156,7 @@ export default handleActions<IState, any>({
     return updateTaskItem(state, id, {
       options,
       status: TaskStatus.PENDING,
+      saved: false,
     })
   },
 
@@ -163,6 +167,7 @@ export default handleActions<IState, any>({
     return updateTaskItem(state, id, {
       options: getInitialTaskOptions(exportExt, defaultOptions),
       status: TaskStatus.PENDING,
+      saved: false,
     })
   },
 
@@ -188,6 +193,7 @@ export default handleActions<IState, any>({
         image,
         optimized,
         status: TaskStatus.DONE,
+        saved: false,
       }
     }))
   },
@@ -197,6 +203,15 @@ export default handleActions<IState, any>({
     return updateTaskItem(state, id, {
       status: TaskStatus.FAIL,
     })
+  },
+
+  [ACTIONS.TASK_SAVED](state, action: Action<string[]>) {
+    const savedIds = new Set(action.payload)
+    return updateTaskList(state, (tasks) => tasks.map((task) => (
+      task.optimized && savedIds.has(task.optimized.id)
+        ? { ...task, saved: true }
+        : task
+    )))
   },
 
   [ACTIONS.OPTIONS_APPLY](state) {
@@ -209,6 +224,7 @@ export default handleActions<IState, any>({
         ...item,
         options: getInitialTaskOptions(exportExt, defaultOptions),
         status: TaskStatus.PENDING,
+        saved: false,
       }
     }))
   },
@@ -238,6 +254,7 @@ export default handleActions<IState, any>({
       ...item,
       options: { ...item.options, resize: resizeOptions },
       status: TaskStatus.PENDING,
+      saved: false,
     })))
   },
 
@@ -250,8 +267,19 @@ export default handleActions<IState, any>({
         ...item,
         options: optionsWithoutResize,
         status: TaskStatus.PENDING,
+        saved: false,
       }
     }))
+  },
+
+  [ACTIONS.BUSY_CHANGE](state, action: Action<IBusyChange>) {
+    const { kind, delta } = action.payload
+    return updateGlobalsPartial(state, {
+      busy: {
+        ...state.globals.busy,
+        [kind]: Math.max(0, state.globals.busy[kind] + delta),
+      },
+    })
   },
 
   [ACTIONS.DEFAULT_OPTIONS_UPDATE](state, action: Action<IDefaultOptionsPayload>) {
@@ -288,6 +316,10 @@ export default handleActions<IState, any>({
       enabled: false,
       mode: ResizeMode.LONG_EDGE,
       value: 1920,
+    },
+    busy: {
+      [BusyKind.IMPORT]: 0,
+      [BusyKind.SAVE]: 0,
     },
   },
 }) as Reducer<IState, any>

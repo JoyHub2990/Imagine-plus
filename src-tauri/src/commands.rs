@@ -19,9 +19,17 @@ pub struct AppState {
     pub menu_state: Mutex<BackendState>,
 }
 
+fn emit_busy(app: &AppHandle, kind: &str, delta: i8) {
+    let _ = app.emit(
+        "BUSY_CHANGE",
+        serde_json::json!({ "kind": kind, "delta": delta }),
+    );
+}
+
 /// Ingest files/dirs (drag-drop, dialog, argv, file association) and either
 /// push them to the renderer or queue them until it signals READY.
 pub fn receive_files(app: &AppHandle, paths: Vec<String>) {
+    emit_busy(app, "import", 1);
     let app = app.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
@@ -29,6 +37,7 @@ pub fn receive_files(app: &AppHandle, paths: Vec<String>) {
         let images = files::save_files_tmp(&files);
 
         if images.is_empty() {
+            emit_busy(&app, "import", -1);
             return;
         }
 
@@ -48,6 +57,8 @@ pub fn receive_files(app: &AppHandle, paths: Vec<String>) {
         if emit_now {
             let _ = app.emit("FILE_SELECTED", &images);
         }
+
+        emit_busy(&app, "import", -1);
     });
 }
 
@@ -203,10 +214,14 @@ pub async fn save(app: AppHandle, images: Vec<ImageFile>, save_type: SaveType) {
                 let Ok(dir) = folder.into_path() else { return };
 
                 let app2 = app.clone();
+                emit_busy(&app2, "save", 1);
                 tauri::async_runtime::spawn_blocking(move || {
-                    files::save_files(&images, SaveType::NewDir, Some(&dir));
-                    let _ = app2.emit("SAVED", ());
+                    let saved_ids = files::save_files(&images, SaveType::NewDir, Some(&dir));
+                    if !saved_ids.is_empty() {
+                        let _ = app2.emit("SAVED", saved_ids);
+                    }
                     let _ = tauri_plugin_opener::open_path(&dir, None::<&str>);
+                    emit_busy(&app2, "save", -1);
                 });
             });
         }
@@ -226,16 +241,24 @@ pub async fn save(app: AppHandle, images: Vec<ImageFile>, save_type: SaveType) {
                 .save_file(move |path| {
                     let Some(path) = path else { return };
                     let Ok(path) = path.into_path() else { return };
-                    if files::save_file(&image, &path).is_ok() {
-                        let _ = app.emit("SAVED", ());
-                    }
+                    emit_busy(&app, "save", 1);
+                    tauri::async_runtime::spawn_blocking(move || {
+                        if files::save_file(&image, &path).is_ok() {
+                            let _ = app.emit("SAVED", vec![image.id]);
+                        }
+                        emit_busy(&app, "save", -1);
+                    });
                 });
         }
         _ => {
             let app2 = app.clone();
+            emit_busy(&app2, "save", 1);
             tauri::async_runtime::spawn_blocking(move || {
-                files::save_files(&images, save_type, None);
-                let _ = app2.emit("SAVED", ());
+                let saved_ids = files::save_files(&images, save_type, None);
+                if !saved_ids.is_empty() {
+                    let _ = app2.emit("SAVED", saved_ids);
+                }
+                emit_busy(&app2, "save", -1);
             })
             .await
             .ok();
@@ -341,8 +364,8 @@ pub fn open_external(url: String) {
 }
 
 /// Custom window buttons (Windows has no titleBarOverlay equivalent).
-/// close() goes through the close-requested path so the alone-mode
-/// interception keeps working.
+/// close() goes through the close-requested path so the renderer's
+/// unsaved-work confirmation still runs.
 #[tauri::command]
 pub fn window_minimize(window: tauri::WebviewWindow) {
     let _ = window.minimize();

@@ -5,10 +5,13 @@ import List from './containers/List'
 import ActionBar from './containers/ActionBar'
 import Alone from './containers/Alone'
 import Settings from './containers/Settings'
+import BusyOverlay from './components/BusyOverlay'
 import { prevent } from './utils/dom-event'
 import store from './store/store'
 import * as apis from './apis'
 import { imagineAPI } from '../bridge/web'
+import { getUnsavedTaskCount } from './store/selectors'
+import __ from '../locales'
 
 import './components/Icon'
 import './App.less'
@@ -23,6 +26,8 @@ class App extends PureComponent<Record<string, never>, { onion: number }> {
   }
 
   componentDidMount() {
+    window.addEventListener('beforeunload', this.handleBeforeClose)
+
     // OS file drags arrive through Tauri's native drag-drop events with
     // absolute paths (the webview suppresses DOM drops for them); the
     // DOM handlers below only guard against in-page drags
@@ -34,6 +39,22 @@ class App extends PureComponent<Record<string, never>, { onion: number }> {
         apis.fileAdd(paths)
       },
     })
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('beforeunload', this.handleBeforeClose)
+  }
+
+  handleBeforeClose = (e: Event) => {
+    const unsavedCount = getUnsavedTaskCount(store.getState())
+    if (!unsavedCount) return
+
+    // Native confirmation is intentional here: Tauri's close request must
+    // be answered synchronously before the window is allowed to close.
+    // eslint-disable-next-line no-alert
+    if (!window.confirm(__('unsaved_close_confirm', unsavedCount))) {
+      e.preventDefault()
+    }
   }
 
   handleDragDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -60,6 +81,7 @@ class App extends PureComponent<Record<string, never>, { onion: number }> {
         </div>
         <Alone />
         <Settings />
+        <BusyOverlay />
       </Provider>
     )
   }

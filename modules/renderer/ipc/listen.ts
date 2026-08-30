@@ -2,7 +2,7 @@ import actions from '../store/actionCreaters'
 import { getActiveTask } from '../store/selectors'
 import store from '../store/store'
 import {
-  IpcChannel, IImageFile, SaveType, ITaskItem, IUpdateInfo,
+  IpcChannel, IImageFile, SaveType, ITaskItem, IUpdateInfo, IBusyChange,
 } from '../../common/types'
 import { showMessage } from '../components/Messager'
 import * as apis from '../apis'
@@ -16,7 +16,8 @@ export default function listenIpc() {
     return
   }
 
-  imagineAPI.ipcListen(IpcChannel.SAVED, () => {
+  imagineAPI.ipcListen(IpcChannel.SAVED, (savedIds: string[]) => {
+    store.dispatch(actions.taskSaved(savedIds))
     const partial = apis.takePartialSaveAll()
 
     if (partial) {
@@ -53,5 +54,9 @@ export default function listenIpc() {
 
   imagineAPI.ipcListen(IpcChannel.APP_UPDATE, (data: IUpdateInfo) => {
     store.dispatch(actions.appUpdateInfo(data))
+  })
+
+  imagineAPI.ipcListen(IpcChannel.BUSY_CHANGE, (data: IBusyChange) => {
+    store.dispatch(actions.busyChange(data))
   })
 }

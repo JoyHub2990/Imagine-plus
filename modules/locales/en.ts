@@ -47,4 +47,7 @@ export default {
   save_anyway: 'Save anyway',
   cancel: 'Cancel',
   save_partial: 'Saved {0} image(s), {1} task(s) still processing',
+  unsaved_close_confirm: '{0} imported image(s) have not been saved. Close anyway?',
+  importing_images: 'Importing images…',
+  saving_images: 'Saving images…',
 }

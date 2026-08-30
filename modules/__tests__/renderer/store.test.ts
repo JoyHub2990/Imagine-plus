@@ -5,10 +5,12 @@ import '../_tools/before-test'
 
 import { createStore } from '../../renderer/store/store'
 import actions from '../../renderer/store/actionCreaters'
+import { getUnsavedTaskCount } from '../../renderer/store/selectors'
 import {
   IImageFile,
   TaskStatus,
   SupportedExt,
+  BusyKind,
 } from '../../common/types'
 
 const image1: IImageFile = {
@@ -48,6 +50,7 @@ test('task add', () => {
         exportExt: SupportedExt.png,
       },
       status: TaskStatus.PENDING,
+      saved: false,
     },
     {
       id: image2.id,
@@ -57,6 +60,7 @@ test('task add', () => {
         exportExt: SupportedExt.jpg,
       },
       status: TaskStatus.PENDING,
+      saved: false,
     },
   ])
 })
@@ -76,6 +80,7 @@ test('task delete', () => {
         exportExt: SupportedExt.png,
       },
       status: TaskStatus.PENDING,
+      saved: false,
     },
   ])
 })
@@ -102,6 +107,7 @@ test('task update options', () => {
         exportExt: SupportedExt.png,
       },
       status: TaskStatus.PENDING,
+      saved: false,
     },
     {
       id: image2.id,
@@ -111,6 +117,7 @@ test('task update options', () => {
         exportExt: SupportedExt.jpg,
       },
       status: TaskStatus.PENDING,
+      saved: false,
     },
   ])
 })
@@ -131,6 +138,7 @@ test('task start', () => {
         exportExt: SupportedExt.png,
       },
       status: TaskStatus.PENDING,
+      saved: false,
     },
     {
       id: image2.id,
@@ -140,6 +148,7 @@ test('task start', () => {
         exportExt: SupportedExt.jpg,
       },
       status: TaskStatus.PROCESSING,
+      saved: false,
     },
   ])
 })
@@ -166,6 +175,7 @@ test('task success', () => {
         exportExt: SupportedExt.png,
       },
       status: TaskStatus.PENDING,
+      saved: false,
     },
     {
       id: image2.id,
@@ -175,6 +185,7 @@ test('task success', () => {
         exportExt: SupportedExt.jpg,
       },
       status: TaskStatus.DONE,
+      saved: false,
       optimized: {
         id: '03',
         url: '02.jpg',
@@ -184,6 +195,19 @@ test('task success', () => {
       },
     },
   ])
+
+  expect(getUnsavedTaskCount(store.getState())).toBe(1)
+
+  store.dispatch(actions.taskSaved(['03']))
+  expect(store.getState().tasks[1].saved).toBe(true)
+  expect(getUnsavedTaskCount(store.getState())).toBe(0)
+
+  store.dispatch(actions.taskUpdateOptions(image2.id, {
+    exportExt: SupportedExt.jpg,
+    quality: 70,
+  }))
+  expect(store.getState().tasks[1].saved).toBe(false)
+  expect(getUnsavedTaskCount(store.getState())).toBe(0)
 })
 
 test('task fail', () => {
@@ -202,6 +226,7 @@ test('task fail', () => {
         exportExt: SupportedExt.png,
       },
       status: TaskStatus.PENDING,
+      saved: false,
     },
     {
       id: image2.id,
@@ -211,6 +236,7 @@ test('task fail', () => {
         exportExt: SupportedExt.jpg,
       },
       status: TaskStatus.FAIL,
+      saved: false,
     },
   ])
 })
@@ -225,6 +251,29 @@ test('globals', () => {
   store.dispatch(actions.taskDetail(null))
 
   expect(store.getState().globals.activeId).toBe(null)
+})
+
+test('busy operations are counted independently and never go negative', () => {
+  const store = createStore()
+
+  store.dispatch(actions.busyChange({ kind: BusyKind.IMPORT, delta: 1 }))
+  store.dispatch(actions.busyChange({ kind: BusyKind.IMPORT, delta: 1 }))
+  store.dispatch(actions.busyChange({ kind: BusyKind.SAVE, delta: 1 }))
+  store.dispatch(actions.busyChange({ kind: BusyKind.IMPORT, delta: -1 }))
+
+  expect(store.getState().globals.busy).toEqual({
+    [BusyKind.IMPORT]: 1,
+    [BusyKind.SAVE]: 1,
+  })
+
+  store.dispatch(actions.busyChange({ kind: BusyKind.IMPORT, delta: -1 }))
+  store.dispatch(actions.busyChange({ kind: BusyKind.IMPORT, delta: -1 }))
+  store.dispatch(actions.busyChange({ kind: BusyKind.SAVE, delta: -1 }))
+
+  expect(store.getState().globals.busy).toEqual({
+    [BusyKind.IMPORT]: 0,
+    [BusyKind.SAVE]: 0,
+  })
 })
 
 test('set globalOptions', () => {
@@ -289,6 +338,7 @@ test('set globalOptions', () => {
         exportExt: SupportedExt.png,
       },
       status: TaskStatus.PENDING,
+      saved: false,
     },
     {
       id: image2.id,
@@ -298,6 +348,7 @@ test('set globalOptions', () => {
         exportExt: SupportedExt.jpg,
       },
       status: TaskStatus.PENDING,
+      saved: false,
     },
   ])
 })

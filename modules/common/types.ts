@@ -49,6 +49,17 @@ export const enum IpcChannel {
   APP_UPDATE = 'APP_UPDATE',
   READY = 'READY',
   RESPONSE = 'RESPONSE',
+  BUSY_CHANGE = 'BUSY_CHANGE',
+}
+
+export enum BusyKind {
+  IMPORT = 'import',
+  SAVE = 'save',
+}
+
+export interface IBusyChange {
+  kind: BusyKind
+  delta: 1 | -1
 }
 
 export const enum SaveType {
@@ -101,6 +112,8 @@ export interface ITaskItem {
   options: IOptimizeOptions
   optimized?: IImageFile
   status: TaskStatus
+  /** true only after the current optimized result is written successfully */
+  saved: boolean
 }
 
 export interface IOptimizeRequest {
@@ -129,6 +142,7 @@ export interface IGlobals {
   optionsVisible: boolean
   defaultOptions: IDefaultOptions
   resizeOptions: IResizeOptions
+  busy: Record<BusyKind, number>
 }
 
 export interface IState {
@@ -155,7 +169,8 @@ export interface RendererIpcPayload {
 
 export interface MainIpcPayload {
   [IpcChannel.SAVE]: SaveType;
-  [IpcChannel.SAVED]: SaveType;
+  [IpcChannel.SAVED]: string[];
   [IpcChannel.FILE_SELECTED]: IImageFile[];
   [IpcChannel.APP_UPDATE]: IUpdateInfo;
+  [IpcChannel.BUSY_CHANGE]: IBusyChange;
 }
