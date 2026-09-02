@@ -34,15 +34,19 @@ jobs:
         include:
           - platform: macos-latest
             os: macOS
+            arch: arm64
             args: '--target aarch64-apple-darwin'
           - platform: macos-latest
             os: macOS
+            arch: x64
             args: '--target x86_64-apple-darwin'
           - platform: ubuntu-22.04
             os: Linux
+            arch: x64
             args: ''
           - platform: windows-latest
             os: Windows
+            arch: x64
             args: ''
 
     runs-on: ${{ matrix.platform }}
@@ -84,10 +88,9 @@ jobs:
         with:
           args: ${{ matrix.args }}
 
-      # rename each bundle to ImaginePlus_<OS>_<arch>… (swap the version
-      # token for the OS label) and upload to the draft release. The Windows
-      # portable exe — the bare binary with embedded assets — is added on
-      # top, since tauri-action only reports bundler outputs.
+      # rename each bundle to ImaginePlus_<OS>_<version>_<arch>… and upload
+      # it to the draft release. The Windows portable exe — the bare binary
+      # with embedded assets — is added since tauri-action only reports bundles.
       - name: Rename and upload assets
         shell: bash
         env:
@@ -96,6 +99,7 @@ jobs:
           TAG: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
           OS_NAME: ${{ matrix.os }}
+          ARCH_NAME: ${{ matrix.arch }}
         run: |
           set -euo pipefail
           version="${TAG#v}"
@@ -133,10 +137,28 @@ jobs:
               continue
             fi
             if [ -n "$portable" ] && [ "$f" = "$portable" ]; then
-              newbase="ImaginePlus_${OS_NAME}_x64-portable.exe"
+              suffix="-portable.exe"
             else
               base="$(basename "$f")"
-              newbase="${base/ImaginePlus_${version}_/ImaginePlus_${OS_NAME}_}"
+              case "$base" in
+                *.AppImage) suffix=".AppImage" ;;
+                *.deb) suffix=".deb" ;;
+                *.rpm) suffix=".rpm" ;;
+                *.dmg) suffix=".dmg" ;;
+                *_en-US.msi) suffix="_en-US.msi" ;;
+                *.msi) suffix=".msi" ;;
+                *-setup.exe) suffix="-setup.exe" ;;
+                *.exe) suffix=".exe" ;;
+                *)
+                  echo "Unsupported release artifact: $base" >&2
+                  exit 1
+                  ;;
+              esac
+            fi
+            newbase="ImaginePlus_${OS_NAME}_${version}_${ARCH_NAME}${suffix}"
+            if [ -e "dist-release/$newbase" ]; then
+              echo "Duplicate release asset name: $newbase" >&2
+              exit 1
             fi
             echo "  $(basename "$f")  ->  $newbase"
             cp "$f" "dist-release/$newbase"
